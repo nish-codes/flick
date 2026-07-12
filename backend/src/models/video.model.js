@@ -5,6 +5,9 @@ const videoSchema =  new Schema({
         type :String,
         require : true
     },
+    streamUrl : {
+        type : String,
+    },
     thumbnail : {
         type : String,
         required : true
@@ -34,6 +37,8 @@ const videoSchema =  new Schema({
         ref : "User"
     }
 })
+
+videoSchema.index({ owner: 1, createdAt: -1 })
 
 videoSchema.plugin(mongooseAggregatePaginate)
 export const Video = mongoose.model("Video",videoSchema)
