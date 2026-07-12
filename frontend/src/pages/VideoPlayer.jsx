@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
@@ -78,15 +78,47 @@ export default function VideoPlayer() {
   const [video, setVideo] = useState(null)
   const [related, setRelated] = useState([])
   const [liked, setLiked] = useState(false)
+  const [likesCount, setLikesCount] = useState(0)
   const [subscribed, setSubscribed] = useState(false)
+  const [subscribersCount, setSubscribersCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [descExpanded, setDescExpanded] = useState(false)
+  const [quality, setQuality] = useState('original')
+  const viewedRef = useRef(false)
+
+  // Reset all per-video state immediately when navigating
+  useEffect(() => {
+    setQuality('original')
+    setLiked(false)
+    setLikesCount(0)
+    setSubscribersCount(0)
+    viewedRef.current = false
+  }, [videoId])
+
+  const QUALITY_TRANSFORMS = {
+    '360p':    'w_640,h_360,c_scale,q_auto',
+    '720p':    'w_1280,h_720,c_scale,q_auto',
+    'original': 'q_auto',
+  }
+
+  const isCloudinary = video?.videoFile?.includes('res.cloudinary.com')
+
+  const currentSrc = useMemo(() => {
+    if (!video?.videoFile) return ''
+    if (!isCloudinary) return video.videoFile
+    const t = QUALITY_TRANSFORMS[quality] || 'q_auto'
+    return video.videoFile.replace('/video/upload/', `/video/upload/${t}/`)
+  }, [video, quality])
 
   useEffect(() => {
     setLoading(true); setVideo(null)
     api.get(`/videos/${videoId}`)
       .then(r => {
-        setVideo(r.data.data)
+        const v = r.data.data
+        setVideo(v)
+        setLiked(v.isLiked || false)
+        setLikesCount(v.likesCount || 0)
+        setSubscribersCount(v.subscribersCount || 0)
         return api.get('/videos', { params: { limit: 8, sortBy: 'createdAt', sortType: 'desc' } })
       })
       .then(r => {
@@ -101,7 +133,9 @@ export default function VideoPlayer() {
     if (!user) { toast('Sign in to like videos', 'info'); return }
     try {
       const r = await api.post(`/likes/toggle/video/${videoId}`)
-      setLiked(r.data.data.liked)
+      const nowLiked = r.data.data.liked
+      setLiked(nowLiked)
+      setLikesCount(c => nowLiked ? c + 1 : c - 1)
     } catch { toast('Failed to toggle like', 'error') }
   }
 
@@ -111,8 +145,10 @@ export default function VideoPlayer() {
     if (!channelId) return
     try {
       const r = await api.post(`/subscriptions/toggle/${channelId}`)
-      setSubscribed(r.data.data.subscribed)
-      toast(r.data.data.subscribed ? 'Subscribed' : 'Unsubscribed', 'success')
+      const nowSub = r.data.data.subscribed
+      setSubscribed(nowSub)
+      setSubscribersCount(c => nowSub ? c + 1 : c - 1)
+      toast(nowSub ? 'Subscribed' : 'Unsubscribed', 'success')
     } catch { toast('Failed to update subscription', 'error') }
   }
 
@@ -132,18 +168,41 @@ export default function VideoPlayer() {
     <div className="player-layout">
       <div>
         <div className="video-player-frame">
-          <video controls autoPlay src={video.videoFile} poster={video.thumbnail}>
-            Your browser does not support video playback.
-          </video>
+          <video
+            key={currentSrc}
+            controls
+            src={currentSrc}
+            poster={video.thumbnail}
+            preload="metadata"
+            style={{ width: '100%', height: '100%', display: 'block', background: '#000' }}
+            onPlay={() => {
+              if (viewedRef.current) return
+              viewedRef.current = true
+              api.post(`/videos/${videoId}/view`).catch(() => {})
+            }}
+          />
         </div>
 
         <div className="player-title">{video.title}</div>
+
+        {isCloudinary && (
+          <div className="quality-row">
+            <span className="quality-label">Quality</span>
+            {Object.keys(QUALITY_TRANSFORMS).map(q => (
+              <button
+                key={q}
+                className={`quality-btn ${quality === q ? 'active' : ''}`}
+                onClick={() => setQuality(q)}
+              >{q === 'original' ? 'Original' : q}</button>
+            ))}
+          </div>
+        )}
 
         <div className="player-meta-row">
           <div className="player-stat">{views(video.views)} views &middot; {ago(video.createdAt)}</div>
           <div className="action-row">
             <button className={`action-btn ${liked ? 'liked' : ''}`} onClick={toggleLike}>
-              {liked ? '♥' : '♡'} {liked ? 'Liked' : 'Like'}
+              {liked ? '♥' : '♡'} {likesCount > 0 ? views(likesCount) : ''} {liked ? 'Liked' : 'Like'}
             </button>
             <button className="action-btn" onClick={() => { navigator.clipboard?.writeText(window.location.href); toast('Link copied', 'info') }}>
               ↗ Share
@@ -164,7 +223,7 @@ export default function VideoPlayer() {
               <div className="channel-text-name" onClick={() => navigate(`/channel/${owner.userName}`)}>
                 {owner.fullName || owner.userName}
               </div>
-              <div className="channel-text-sub">@{owner.userName}</div>
+              <div className="channel-text-sub">@{owner.userName} &middot; {views(subscribersCount)} subscribers</div>
             </div>
           </div>
           {user?._id !== owner._id && (

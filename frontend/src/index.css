@@ -392,6 +392,33 @@ body {
   letter-spacing: -0.2px;
 }
 
+.quality-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.quality-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-right: 4px;
+}
+.quality-btn {
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--mid);
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+}
+.quality-btn:hover { border-color: var(--text); color: var(--text); }
+.quality-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
 .player-meta-row {
   display: flex;
   align-items: center;
@@ -798,6 +825,37 @@ body {
   .stat-cell:nth-child(3) { border-top: 1px solid var(--rule); }
   .stat-cell:nth-child(4) { border-top: 1px solid var(--rule); }
 }
+/* ─── Subscriptions ─── */
+.subs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 4px;
+  transition: background .12s;
+  cursor: pointer;
+}
+.sub-row:hover { background: var(--surface); }
+.sub-info { flex: 1; min-width: 0; }
+.sub-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sub-handle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 @media (max-width: 768px) {
   .navbar { padding: 0 16px; gap: 16px; }
   .nav-links { display: none; }

@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const [showUpload, setShowUpload] = useState(false)
   const [form, setForm] = useState({ title: '', description: '' })
   const [videoFile, setVideoFile] = useState(null)
@@ -26,24 +27,73 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
   }, [user])
 
+  const uploadToCloudinary = (file, sig, resourceType, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('api_key', sig.apiKey)
+      fd.append('timestamp', sig.timestamp)
+      fd.append('signature', sig.signature)
+      fd.append('folder', sig.folder)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`)
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => {
+        const res = JSON.parse(xhr.responseText)
+        if (xhr.status === 200) resolve(res)
+        else reject(new Error(res.error?.message || 'Cloudinary upload failed'))
+      }
+      xhr.onerror = () => reject(new Error('Network error during upload'))
+      xhr.send(fd)
+    })
+  }
+
   const uploadVideo = async e => {
     e.preventDefault()
     if (!form.title || !videoFile || !thumbnail) { toast('Title, video and thumbnail required', 'error'); return }
-    const fd = new FormData()
-    fd.append('title', form.title)
-    fd.append('description', form.description)
-    fd.append('video', videoFile)
-    fd.append('thumbnail', thumbnail)
     setUploading(true)
     try {
-      const r = await api.post('/videos', fd)
+      // Step 1: get signatures from backend
+      setUploadProgress('Preparing upload…')
+      const sigRes = await api.get('/videos/upload-signature')
+      const { video: videoSig, thumbnail: thumbSig } = sigRes.data.data
+
+      // Step 2: upload thumbnail directly to Cloudinary
+      setUploadProgress('Uploading thumbnail…')
+      const thumbResult = await uploadToCloudinary(thumbnail, thumbSig, 'image', () => {})
+
+      // Step 3: upload video directly to Cloudinary with progress
+      setUploadProgress('Uploading video… 0%')
+      const videoResult = await uploadToCloudinary(videoFile, videoSig, 'video', pct => {
+        setUploadProgress(`Uploading video… ${pct}%`)
+      })
+
+      // Step 4: tell backend to save the URLs
+      setUploadProgress('Publishing…')
+      const r = await api.post('/videos/save', {
+        title: form.title,
+        description: form.description,
+        videoFile: videoResult.secure_url,
+        thumbnail: thumbResult.secure_url,
+        duration: videoResult.duration || 0,
+        publicId: videoResult.public_id,
+      })
+
       setVideos(v => [r.data.data, ...v])
       setShowUpload(false)
-      setForm({ title: '', description: '' }); setVideoFile(null); setThumbnail(null)
+      setForm({ title: '', description: '' })
+      setVideoFile(null)
+      setThumbnail(null)
       toast('Video published', 'success')
     } catch (err) {
-      toast(err?.response?.data?.message || 'Upload failed', 'error')
-    } finally { setUploading(false) }
+      toast(err?.response?.data?.message || err?.message || 'Upload failed', 'error')
+    } finally {
+      setUploading(false)
+      setUploadProgress('')
+    }
   }
 
   const togglePublish = async id => {
@@ -119,7 +169,7 @@ export default function Dashboard() {
               </label>
             </div>
             <button type="submit" className="btn btn-primary" disabled={uploading} style={{ marginTop: 4 }}>
-              {uploading ? 'Uploading…' : 'Publish video'}
+              {uploading ? uploadProgress || 'Uploading…' : 'Publish video'}
             </button>
           </form>
         </div>

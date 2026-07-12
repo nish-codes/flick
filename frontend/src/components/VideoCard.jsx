@@ -1,4 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+function thumbColor(title = '') {
+  const hue = [...title].reduce((a, c) => a + c.charCodeAt(0), 0) % 360
+  return `linear-gradient(135deg, hsl(${hue},35%,72%), hsl(${(hue + 40) % 360},45%,60%))`
+}
 
 export function fmt(s) {
   if (!s) return ''
@@ -27,13 +33,14 @@ export function ago(date) {
 export default function VideoCard({ video, badge }) {
   const navigate = useNavigate()
   const owner = video.ownerInfo || video.owner || {}
+  const [imgFailed, setImgFailed] = useState(false)
 
   return (
     <div className="video-card" onClick={() => navigate(`/video/${video._id}`)}>
       <div className="video-thumbnail">
-        {video.thumbnail
-          ? <img src={video.thumbnail} alt={video.title} loading="lazy" />
-          : <div style={{ width:'100%', height:'100%', background:'var(--surface)' }} />
+        {video.thumbnail && !imgFailed
+          ? <img src={video.thumbnail} alt={video.title} loading="lazy" onError={() => setImgFailed(true)} />
+          : <div style={{ width:'100%', height:'100%', background: thumbColor(video.title) }} />
         }
         {video.duration && <span className="video-duration">{fmt(video.duration)}</span>}
         {badge && <span className="video-badge">{badge}</span>}

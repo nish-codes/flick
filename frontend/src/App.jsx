@@ -12,6 +12,7 @@ import LikedVideos from './pages/LikedVideos'
 import Playlists from './pages/Playlists'
 import Dashboard from './pages/Dashboard'
 import WatchHistory from './pages/WatchHistory'
+import Subscriptions from './pages/Subscriptions'
 
 const NO_NAV = ['/login', '/register']
 
@@ -41,6 +42,7 @@ function Shell() {
             <Route path="/playlists"       element={<Playlists />} />
             <Route path="/dashboard"       element={<Dashboard />} />
             <Route path="/history"         element={<WatchHistory />} />
+            <Route path="/subscriptions"   element={<Subscriptions />} />
             <Route path="*" element={
               <div className="empty">
                 <div className="empty-glyph">404</div>

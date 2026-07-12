@@ -7,7 +7,7 @@ export default function Login() {
   const { login } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ identifier: '', password: '' })
   const [loading, setLoading] = useState(false)
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -16,7 +16,7 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      await login(form.email, form.password)
+      await login(form.identifier, form.password)
       toast('Welcome back', 'success')
       navigate('/')
     } catch (err) {
@@ -38,8 +38,8 @@ export default function Login() {
 
         <form onSubmit={submit}>
           <div className="field">
-            <label className="field-label">Email</label>
-            <input type="email" className="field-input" value={form.email} onChange={set('email')} placeholder="you@example.com" required />
+            <label className="field-label">Email or username</label>
+            <input type="text" className="field-input" value={form.identifier} onChange={set('identifier')} placeholder="you@example.com or @handle" required autoComplete="username" />
           </div>
           <div className="field">
             <label className="field-label">Password</label>

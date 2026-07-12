@@ -76,11 +76,12 @@ export default function Navbar({ onSearch }) {
                   <div className="user-dropdown-handle">@{user.userName}</div>
                 </div>
                 {[
-                  { label: 'Your Channel', path: `/channel/${user.userName}` },
-                  { label: 'Studio',       path: '/dashboard' },
-                  { label: 'Playlists',    path: '/playlists' },
-                  { label: 'Liked videos', path: '/liked' },
-                  { label: 'History',      path: '/history' },
+                  { label: 'Your Channel',  path: `/channel/${user.userName}` },
+                  { label: 'Subscriptions', path: '/subscriptions' },
+                  { label: 'Studio',        path: '/dashboard' },
+                  { label: 'Playlists',     path: '/playlists' },
+                  { label: 'Liked videos',  path: '/liked' },
+                  { label: 'History',       path: '/history' },
                 ].map(item => (
                   <button key={item.path} className="user-dropdown-item"
                     onClick={() => { navigate(item.path); setMenuOpen(false) }}>
