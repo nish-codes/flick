@@ -3,8 +3,10 @@ import { asyncHandler } from "../utils/asynchHandler.js";
 import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary, uploadVideoOnCloudinary, deleteFromCloudinary, generateUploadSignature } from "../utils/cloudinary.js";
 import { User } from "../models/user.model.js";
+import { Like } from "../models/like.model.js";
+import { Subscription } from "../models/subscription.model.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query = "", sortBy = "createdAt", sortType = "desc", userId } = req.query
@@ -42,21 +44,24 @@ const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     if (!mongoose.Types.ObjectId.isValid(videoId)) throw new ApiError(400, "Invalid video ID")
 
-    const video = await Video.findByIdAndUpdate(videoId,
-        { $inc: { views: 1 } },
-        { new: true }
-    ).populate("owner", "_id userName avatar fullName")
+    const video = await Video.findById(videoId)
+        .populate("owner", "_id userName avatar fullName")
 
     if (!video) throw new ApiError(404, "Video not found")
 
-    // Add to watch history if user is logged in
-    if (req.user) {
-        await User.findByIdAndUpdate(req.user._id, {
-            $addToSet: { watchHistory: videoId }
-        })
-    }
+    const [likesCount, isLikedDoc, subscribersCount] = await Promise.all([
+        Like.countDocuments({ video: videoId }),
+        req.user ? Like.findOne({ video: videoId, likedBy: req.user._id }) : null,
+        Subscription.countDocuments({ channel: video.owner._id }),
+        req.user ? User.findByIdAndUpdate(req.user._id, { $addToSet: { watchHistory: videoId } }) : null
+    ])
 
-    res.status(200).json(new ApiResponse(200, video, "Video fetched successfully"))
+    res.status(200).json(new ApiResponse(200, {
+        ...video.toObject(),
+        likesCount,
+        isLiked: !!isLikedDoc,
+        subscribersCount
+    }, "Video fetched successfully"))
 })
 
 const publishVideo = asyncHandler(async (req, res) => {
@@ -69,7 +74,7 @@ const publishVideo = asyncHandler(async (req, res) => {
     if (!videoPath || !thumbnailPath) throw new ApiError(400, "Video file and thumbnail are required")
 
     const [videoUpload, thumbnailUpload] = await Promise.all([
-        uploadOnCloudinary(videoPath),
+        uploadVideoOnCloudinary(videoPath),
         uploadOnCloudinary(thumbnailPath)
     ])
     if (!videoUpload || !thumbnailUpload) throw new ApiError(500, "Failed to upload video or thumbnail")
@@ -78,7 +83,8 @@ const publishVideo = asyncHandler(async (req, res) => {
         title,
         description,
         thumbnail: thumbnailUpload.url,
-        videoFile: videoUpload.url,
+        videoFile: videoUpload.secure_url,
+        streamUrl: videoUpload.streamUrl,
         duration: videoUpload.duration,
         owner: userId,
         isPublished: true
@@ -130,4 +136,38 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, video, `Video ${video.isPublished ? "published" : "unpublished"} successfully`))
 })
 
-export { getAllVideos, getVideoById, publishVideo, updateVideo, deleteVideo, togglePublishStatus }
+const recordView = asyncHandler(async (req, res) => {
+    const { videoId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(videoId)) throw new ApiError(400, "Invalid video ID")
+    await Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } })
+    if (req.user) {
+        await User.findByIdAndUpdate(req.user._id, { $addToSet: { watchHistory: videoId } })
+    }
+    res.status(200).json(new ApiResponse(200, {}, "View recorded"))
+})
+
+const getUploadSignature = asyncHandler(async (req, res) => {
+    const videoSig = generateUploadSignature("flick/videos", "video")
+    const thumbSig = generateUploadSignature("flick/thumbnails", "image")
+    res.status(200).json(new ApiResponse(200, { video: videoSig, thumbnail: thumbSig }, "Signatures generated"))
+})
+
+const saveVideo = asyncHandler(async (req, res) => {
+    const { title, description, videoFile, thumbnail, duration, publicId } = req.body
+    if (!title || !videoFile || !thumbnail) throw new ApiError(400, "Title, video and thumbnail are required")
+
+    const newVideo = await Video.create({
+        title,
+        description: description || "",
+        thumbnail,
+        videoFile,
+        streamUrl: `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/sp_hd/${publicId}.m3u8`,
+        duration: duration || 0,
+        owner: req.user._id,
+        isPublished: true
+    })
+
+    res.status(201).json(new ApiResponse(201, newVideo, "Video published successfully"))
+})
+
+export { getAllVideos, getVideoById, publishVideo, updateVideo, deleteVideo, togglePublishStatus, recordView, getUploadSignature, saveVideo }
