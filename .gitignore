@@ -3,5 +3,6 @@ node_modules/
 .env.local
 .env.*.local
 dist/
+backend/public/dist/
 *.log
 .DS_Store
