@@ -24,4 +24,14 @@ jobs:
 
       - name: Run tests
         run: cd backend && npm test
+        env:
+          ACCESS_TOKEN_SECRET: test_access_secret_for_ci
+          ACCESS_TOKEN_EXPIRY: 1d
+          REFRESH_TOKEN_SECRET: test_refresh_secret_for_ci
+          REFRESH_TOKEN_EXPIRY: 10d
+          CLOUDINARY_CLOUD_NAME: test_cloud
+          CLOUDINARY_API_KEY: test_key
+          CLOUDINARY_API_SECRET: test_secret
+          PORT: 3000
+          CORS_ORIGIN: "*"
 
