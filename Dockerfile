@@ -19,6 +19,7 @@ COPY backend/package*.json ./
 RUN npm install --omit=dev
 
 COPY backend/ ./
+RUN mkdir -p public/temp
 
 COPY --from=frontend /frontend/dist ./public/dist
 
