@@ -47,5 +47,5 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/flick:latest
 
-      - name: Deploy to Railway
-        run: curl -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}"
+      - name: Deploy to Render
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
